@@ -1,19 +1,3 @@
-import{
-    auth,
-    createUserWithEmailAndPassword,
-    onAuthStateChanged,
-    signInWithEmailAndPassword,
-    signOut,
-    db,
-    doc,
-    setDoc,
-    getDoc,
-    
-}from"./firebase.js";
-
-
-
-
 let currentCnicToDelete = '';
 
 // Event listener for adding a student
@@ -86,7 +70,7 @@ function addStudentToTable(student) {
         <td>
             <button class="btn btn-info btn-sm" onclick="openAddMarksModal('${student.cnic}', '${student.firstName} ${student.lastName}')"><i class="fas fa-plus"></i></button>
             <button class="btn btn-success btn-sm" onclick="viewResult('${student.cnic}')"><i class="fas fa-eye"></i></button>
-            <button class="btn btn-warning btn-sm d-none" onclick="openEditProfile('${student.cnic}')"><i class="fas fa-pencil-alt"></i></button>
+            <button class="btn btn-warning btn-sm" onclick="openEditProfile('${student.cnic}')"><i class="fas fa-pencil-alt"></i></button>
             <button class="btn btn-danger btn-sm" onclick="confirmDelete('${student.cnic}')"><i class="fas fa-trash"></i></button>
         </td>
     `;

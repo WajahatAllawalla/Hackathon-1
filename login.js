@@ -1,15 +1,3 @@
-import{
-  auth,
-  createUserWithEmailAndPassword,
-
-} from"./firebase.js";
-
-
-export{
-  auth,
-  createUserWithEmailAndPassword,
-}
-
 // Default login credentials
 const defaultUsername = 'admin';
 const defaultPassword = 'admin123';
@@ -21,7 +9,7 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
   // Get the values from the input fields
   const username = document.getElementById('loginUsername').value;
   const password = document.getElementById('loginPassword').value;
-  createUserWithEmailAndPassword(auth,loginUsername.value,loginPassword.value)
+  
   // Check if the entered username and password match the default credentials
   if (username === defaultUsername && password === defaultPassword) {
     // Redirect to index.html page on successful login
