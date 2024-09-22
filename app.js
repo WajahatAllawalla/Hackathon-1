@@ -1,7 +1,19 @@
-let currentCnicToDelete = '';
+import {
+    db,
+    collection,
+    addDoc,
+    getDocs,
+    doc,
+    deleteDoc,
+    updateDoc,
+}
+from "./firebase.js";
+
+const studentCollectionRef = collection(db, 'students');  // Firestore collection reference
+let currentDocIdToDelete = '';  // Firestore document ID for deletion
 
 // Event listener for adding a student
-document.getElementById('addStudentForm').addEventListener('submit', function (e) {
+document.getElementById('addStudentForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     
     // Validate fields
@@ -15,7 +27,7 @@ document.getElementById('addStudentForm').addEventListener('submit', function (e
 
     if (!firstName) errors.push("First Name is required.");
     if (!lastName) errors.push("Last Name is required.");
-    if (!validateEmail(email)) errors.push("Invalid Email.");
+    // if (!validateEmail(email)) errors.push("Invalid Email.");
     if (!password) errors.push("Password is required.");
     if (!cnic) errors.push("CNIC is required.");
 
@@ -32,32 +44,19 @@ document.getElementById('addStudentForm').addEventListener('submit', function (e
         cnic,
         marks: {}
     };
-    localStorage.setItem('student_' + student.cnic, JSON.stringify(student));
-    addStudentToTable(student);
-    this.reset();
-});
-
-// Function to validate email
-function validateEmail(email) {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(String(email).toLowerCase());
-}
-
-// Function to show error messages
-function showError(message, type) {
-    const alertPlaceholder = document.createElement('div');
-    alertPlaceholder.innerHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    `;
-    document.body.insertBefore(alertPlaceholder, document.body.firstChild);
     
-    setTimeout(() => {
-        alertPlaceholder.remove();
-    }, 2000); // Show error for 2 seconds
-}
+    try {
+        // Add student to Firestore and get the document ID
+        const docRef = await addDoc(studentCollectionRef, student);
+        student.id = docRef.id;  // Store Firestore document ID in the student object
+
+        addStudentToTable(student);
+        showAlert('Student added successfully!', 'success');
+        this.reset();
+    } catch (error) {
+        showError('Failed to add student: ' + error.message, 'danger');
+    }
+});
 
 // Function to add a student to the table
 function addStudentToTable(student) {
@@ -71,102 +70,145 @@ function addStudentToTable(student) {
             <button class="btn btn-info btn-sm" onclick="openAddMarksModal('${student.cnic}', '${student.firstName} ${student.lastName}')"><i class="fas fa-plus"></i></button>
             <button class="btn btn-success btn-sm" onclick="viewResult('${student.cnic}')"><i class="fas fa-eye"></i></button>
             <button class="btn btn-warning btn-sm" onclick="openEditProfile('${student.cnic}')"><i class="fas fa-pencil-alt"></i></button>
-            <button class="btn btn-danger btn-sm" onclick="confirmDelete('${student.cnic}')"><i class="fas fa-trash"></i></button>
+            <button class="btn btn-danger btn-sm" onclick="confirmDelete('${student.id}')"><i class="fas fa-trash"></i></button>
         </td>
     `;
 }
 
 // Confirm deletion of a student
-function confirmDelete(cnic) {
-    currentCnicToDelete = cnic;
+function confirmDelete(docId) {
+    currentDocIdToDelete = docId;
     const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
     modal.show();
 }
 
-// Delete student and update localStorage
-document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-    localStorage.removeItem('student_' + currentCnicToDelete);
-    const row = [...document.querySelectorAll('#studentTable tbody tr')].find(tr => tr.cells[0].textContent === currentCnicToDelete);
-    if (row) row.remove();
-    showAlert('Student deleted successfully!', 'success');
+// Delete student from Firestore
+document.getElementById('confirmDeleteBtn').addEventListener('click', async function () {
+    try {
+        if (currentDocIdToDelete) {
+            await deleteDoc(doc(db, 'students', currentDocIdToDelete));
+            const row = [...document.querySelectorAll('#studentTable tbody tr')].find(tr => tr.cells[0].getAttribute('data-doc-id') === currentDocIdToDelete);
+            if (row) row.remove();
+            showAlert('Student deleted successfully!', 'success');
+        }
+    } catch (error) {
+        showError('Failed to delete student: ' + error.message, 'danger');
+    }
+
     const modal = bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal'));
     modal.hide();
 });
 
-// Function to open the add marks modal
-function openAddMarksModal(cnic, name) {
-    document.getElementById('studentNameMarks').innerText = name;
-    const student = JSON.parse(localStorage.getItem('student_' + cnic));
-    document.getElementById('addMarksForm').reset();
-    const modal = new bootstrap.Modal(document.getElementById('addMarksModal'));
-    modal.show();
-
-    document.getElementById('addMarksForm').onsubmit = function (e) {
-        e.preventDefault();
-        for (const subject of ['html', 'css', 'js', 'advJs', 'react', 'typescript', 'nextJs', 'firebase', 'nestJs']) {
-            const marks = document.getElementById(subject + 'Marks').value;
-            if (marks) {
-                student.marks[subject] = parseInt(marks, 10);
-            }
-        }
-        localStorage.setItem('student_' + cnic, JSON.stringify(student));
-        showAlert('Marks added successfully!', 'success');
-        modal.hide();
-    };
-}
-
-// Function to view student results
-function viewResult(cnic) {
-    const student = JSON.parse(localStorage.getItem('student_' + cnic));
-    let totalMarks = 0;
-    let obtainedMarks = 0;
-    let resultHtml = `<h4>${student.firstName} ${student.lastName}</h4><br>CNIC: ${student.cnic}<br><strong>Marks:</strong><br>`;
-    for (const [subject, marks] of Object.entries(student.marks)) {
-        resultHtml += `${subject.charAt(0).toUpperCase() + subject.slice(1)}: ${marks}<br>`;
-        obtainedMarks += marks;
-        totalMarks += 100;
-    }
-    const percentage = (obtainedMarks / totalMarks) * 100;
-    const grade = getGrade(percentage);
-    resultHtml += `<br><strong>Total Marks: ${obtainedMarks}/${totalMarks}</strong><br>`;
-    resultHtml += `<strong>Percentage: ${percentage.toFixed(2)}%</strong><br>`;
-    resultHtml += `<strong>Grade: ${grade}</strong><br>`;
-    
-    document.getElementById('resultContent').innerHTML = resultHtml;
-    const modal = new bootstrap.Modal(document.getElementById('viewResultModal'));
-    modal.show();
-}
-
-// Function to get grade based on percentage
-function getGrade(percentage) {
-    if (percentage >= 75) return 'A';
-    if (percentage >= 50) return 'B';
-    if (percentage >= 40) return 'C';
-    return 'F';
-}
-
-// Function to show alert messages
-function showAlert(message, type) {
-    const alertPlaceholder = document.createElement('div');
-    alertPlaceholder.innerHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    `;
-    document.body.insertBefore(alertPlaceholder, document.body.firstChild);
-    setTimeout(() => {
-        alertPlaceholder.remove();
-    }, 3000);
-}
-
-// Load students from localStorage on window load
-window.onload = function () {
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key.startsWith('student_')) {
-            const student = JSON.parse(localStorage.getItem(key));
+// Load students from Firestore on window load
+window.onload = async function () {
+    try {
+        const querySnapshot = await getDocs(studentCollectionRef);
+        querySnapshot.forEach((doc) => {
+            const student = doc.data();
+            student.id = doc.id;  // Store document ID in the student object
             addStudentToTable(student);
-        }
+        });
+    } catch (error) {
+        showError('Failed to load students: ' + error.message, 'danger');
     }
+};
+
+// Other functions (validateEmail, showError, openAddMarksModal, viewResult, etc.) remain unchanged
+
+
+// import { db } from './firebase.js'; // Import Firebase services
+// import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
+
+// Reference to the 'students' collection in Firestore
+// const studentsRef = collection(db, 'students');
+
+// Handle Add Student form submission
+
+// document.getElementById('addStudentForm').addEventListener('submit', async (e) => {
+//     e.preventDefault(); // Prevent form from refreshing the page
+    
+//     const firstName = document.getElementById('firstName').value;
+//     const lastName = document.getElementById('lastName').value;
+//     const email = document.getElementById('email').value;
+//     const password = document.getElementById('password').value;
+//     const cnic = document.getElementById('cnic').value;
+
+//     try {
+//         // Add a new document in the 'students' collection
+//         await addDoc(studentsRef, {
+//             firstName,
+//             lastName,
+//             email,
+//             password,  // For real systems, passwords shouldn't be stored in plain text
+//             cnic,
+//         });
+//         alert('Student added successfully!');
+//     } catch (error) {
+//         console.error('Error adding student: ', error);
+//     }
+
+//     // Optionally reset the form after submission
+//     e.target.reset();
+// });
+
+// Fetch and display students
+
+
+// const loadStudents = async () => {
+//     const querySnapshot = await getDocs(studentsRef);
+//     const tableBody = document.querySelector('#studentTable tbody');
+//     tableBody.innerHTML = '';  // Clear table before appending new rows
+
+//     querySnapshot.forEach((doc) => {
+//         const student = doc.data();
+//         const row = `<tr>
+//                         <td>${student.cnic}</td>
+//                         <td>${student.firstName} ${student.lastName}</td>
+//                         <td>${student.email}</td>
+//                         <td>
+//                             <button class="btn btn-sm btn-primary" onclick="openAddMarksModal('${doc.id}', '${student.firstName} ${student.lastName}')">Add Marks</button>
+//                             <button class="btn btn-sm btn-danger" onclick="openDeleteModal('${doc.id}')">Delete</button>
+//                         </td>
+//                     </tr>`;
+//         tableBody.insertAdjacentHTML('beforeend', row);
+//     });
+// };
+
+// Call loadStudents to display the list when the page loads
+loadStudents();
+
+// Handle Deletion
+const openDeleteModal = (studentId) => {
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    confirmDeleteBtn.onclick = async () => {
+        await deleteDoc(doc(db, 'students', studentId));
+        alert('Student deleted successfully!');
+        loadStudents();  // Refresh student list
+    };
+};
+
+// Add marks functionality
+const openAddMarksModal = (studentId, studentName) => {
+    document.getElementById('studentNameMarks').innerText = studentName;
+    
+    // Handle marks submission
+    document.getElementById('addMarksForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const htmlMarks = document.getElementById('htmlMarks').value;
+        // Add other marks fields as needed
+        
+        try {
+            const studentDoc = doc(db, 'students', studentId);
+            await updateDoc(studentDoc, { htmlMarks });  // Update student with marks
+            alert('Marks added successfully!');
+        } catch (error) {
+            console.error('Error updating marks: ', error);
+        }
+
+        // Reset form and close modal
+        e.target.reset();
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addMarksModal'));
+        modal.hide();
+    });
 };

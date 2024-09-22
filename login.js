@@ -1,4 +1,34 @@
-// Default login credentials
+import { getAuth, signInWithEmailAndPassword } from "./firebase.js";
+
+const auth = getAuth();  // Initialize Firebase authentication
+
+// Add event listener for login form submission
+document.getElementById('loginForm').addEventListener('submit', function(event) {
+  event.preventDefault(); // Prevent form submission
+  
+  // Get the values from the input fields
+  const username = document.getElementById('loginUsername').value;
+  const password = document.getElementById('loginPassword').value;
+  
+  // Sign in using Firebase Authentication
+  signInWithEmailAndPassword(auth, username, password)
+    .then((userCredential) => {
+      // Redirect to index.html on successful login
+      // window.location.href = 'index.html';
+    })
+    .catch((error) => {
+      // Show error message if authentication fails
+      document.getElementById('loginError').classList.remove('d-none');
+    });
+});
+
+// Hide the error message when the user starts typing
+document.getElementById('loginUsername').addEventListener('input', hideError);
+document.getElementById('loginPassword').addEventListener('input', hideError);
+
+function hideError() {
+  document.getElementById('loginError').classList.add('d-none');
+}
 const defaultUsername = 'admin';
 const defaultPassword = 'admin123';
 
@@ -20,10 +50,21 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
   }
 });
 
-// Hide the error message when user starts typing
-document.getElementById('loginUsername').addEventListener('input', hideError);
-document.getElementById('loginPassword').addEventListener('input', hideError);
 
-function hideError() {
-  document.getElementById('loginError').classList.add('d-none');
-}
+// const log = document.getElementById("loginUsername")
+// const pass = document.getElementById("loginPassword")
+
+// import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+
+// const auth = getAuth();
+// createUserWithEmailAndPassword(auth, log.value, pass.value)
+//   .then((userCredential) => {
+//     // Signed up 
+//     const user = userCredential.user;
+//     // ...
+//   })
+//   .catch((error) => {
+//     const errorCode = error.code;
+//     const errorMessage = error.message;
+//     // ..
+//   });
